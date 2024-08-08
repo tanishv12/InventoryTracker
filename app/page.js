@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from "react";
-import { firestore, storage } from '@/firebase';
+import { firestore, storage, model } from '@/firebase';
 import { Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid } from "@mui/material";
 import { collection, query, getDocs, setDoc, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -143,6 +143,39 @@ export default function Home() {
     clearTimeout(longPressTimerRef.current);
   };
 
+  const fileToGenerativePart = async (file) => {
+    const base64EncodedDataPromise = new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+    return {
+      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+    };
+  };
+
+  const handleFileUpload = async () => {
+    if (!itemImage) return;
+
+    const prompt = "Identify the item in the picture with one word.";
+    const imageParts = await fileToGenerativePart(itemImage);
+
+    try {
+      const result = await model.generateContentStream([prompt, imageParts]);
+
+      let identifiedItem = '';
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        identifiedItem += chunkText;
+      }
+
+      console.log('Identified Item:', identifiedItem);
+      setItemName(identifiedItem.trim());
+    } catch (error) {
+      console.error("Error generating content: ", error);
+    }
+  };
+
   return (
     <Box width="100vw" height="100vh" display="flex" justifyContent="center" alignItems="center" flexDirection="column" gap={2}>
       <Modal open={open} onClose={handleClose}>
@@ -172,7 +205,17 @@ export default function Home() {
               onChange={(e) => setItemName(e.target.value)}
               label="Item Name"
             />
-            <input type="file" onChange={(e) => setItemImage(e.target.files[0])} />
+            <Box>
+              <input type="file" onChange={(e) => setItemImage(e.target.files[0])} />
+              <Button 
+                variant="contained" 
+                size="small" 
+                sx={{ minWidth: '30px', padding: '5px 10px', fontSize: '10px' }}
+                onClick={handleFileUpload}
+              >
+                Classify
+              </Button>
+            </Box>
             <Button
               variant="contained"
               onClick={() => {
@@ -290,7 +333,7 @@ export default function Home() {
           placeholder="Search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ flex: 1 }} // Use flex to make the search bar take most of the space
+          sx={{ flex: 0.7 }} // Use flex to make the search bar take most of the space
         />
         <Button variant="contained" onClick={handleOpen} sx={{ flexShrink: 0 }}>Add New Item</Button>
       </Box>
