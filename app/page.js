@@ -2,11 +2,35 @@
 import { useState, useEffect, useRef } from "react";
 import { Camera } from "react-camera-pro";
 import { firestore, storage, model } from '@/firebase';
-import { Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid } from "@mui/material";
+import {
+  Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid, Container, ListItemText,
+  AppBar, Toolbar, IconButton, InputBase, Paper, Fab, Divider, ThemeProvider ,createTheme, List, ListItem
+} from "@mui/material";
+import { Add as AddIcon, Search as SearchIcon, Close as CloseIcon } from '@mui/icons-material';
 import { collection, query, getDocs, setDoc, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const defaultImageUrl = 'https://coolbackgrounds.io/images/backgrounds/white/white-trianglify-b79c7e1f.jpg';
+
+const customTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#000000', // Black
+    },
+    secondary: {
+      main: '#B0B0B0', // Dark gray
+    },
+    background: {
+      default: '#121212', // Very dark gray
+      paper: '#B0B0B0', // Dark gray for cards and papers
+    },
+    text: {
+      primary: '#000000', // White text
+      secondary: '#424242', // Light gray text
+    },
+  },
+});
 
 export default function Home() {
   const [inventory, setInventory] = useState([]);
@@ -21,6 +45,7 @@ export default function Home() {
   const [itemImage, setItemImage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const longPressTimerRef = useRef(null);
+  const [recipes, setRecipes] = useState('');
 
   const updateInventory = async () => {
     const snapshot = await getDocs(collection(firestore, 'inventory'));
@@ -87,10 +112,8 @@ export default function Home() {
       imageUrl = await getDownloadURL(storageRef);
     }
 
-    // Update the existing document
     await updateDoc(docRef, { name: updatedName, quantity: parseInt(updatedQuantity), imageUrl });
 
-    // If the name has changed, create a new document with the updated name and delete the old one
     if (currentItem.name !== updatedName) {
       const newDocRef = doc(firestore, 'inventory', updatedName);
       await setDoc(newDocRef, { name: updatedName, quantity: parseInt(updatedQuantity), imageUrl });
@@ -111,7 +134,7 @@ export default function Home() {
     setCurrentItem(item);
     setUpdatedName(item.name);
     setUpdatedQuantity(item.quantity.toString());
-    setItemImage(null); // Clear previous image
+    setItemImage(null);
     setUpdate(true);
   };
   const handleCloseUpdate = () => setUpdate(false);
@@ -125,24 +148,20 @@ export default function Home() {
   );
 
   const handleLongPress = (item) => {
-    console.log("Long Press detected on:", item.name);
     handleUpdateOpen(item);
   };
 
   const handleMouseDown = (item) => {
-    console.log("Mouse Down on:", item.name);
     longPressTimerRef.current = setTimeout(() => {
       handleLongPress(item);
-    }, 1000); // 1 second for long press
+    }, 1000);
   };
 
   const handleMouseUp = () => {
-    console.log("Mouse Up");
     clearTimeout(longPressTimerRef.current);
   };
 
   const handleMouseLeave = () => {
-    console.log("Mouse Leave");
     clearTimeout(longPressTimerRef.current);
   };
 
@@ -160,7 +179,7 @@ export default function Home() {
   const handleFileUpload = async () => {
     if (!itemImage) return;
 
-    const prompt = "Identify the item in the picture with one word.";
+    const prompt = "Identify the item in the picture with one word without a period.";
     const imageParts = await fileToGenerativePart(itemImage);
 
     try {
@@ -172,27 +191,40 @@ export default function Home() {
         identifiedItem += chunkText;
       }
 
-      console.log('Identified Item:', identifiedItem);
       setItemName(identifiedItem.trim());
     } catch (error) {
       console.error("Error generating content: ", error);
     }
   };
 
+  const generateRecipes = async () => {
+    const foodItems = inventory.map(item => item.name).join(", ");
+    const prompt = "Generate a few recipes using these ingredients: " + foodItems + ". Make it very concise with instructions.";
+
+    try {
+      const result = await model.generateContentStream([{ text: prompt }]);
+
+      let generatedRecipe = '';
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        generatedRecipe += chunkText;
+      }
+
+      setRecipes(generatedRecipe.trim());
+    } catch (error) {
+      console.error("Error generating content: ", error);
+    }
+  };
+  
   const handleCamClick = () => {
     setCameraOpen(true);
   };
 
-  const handleCamAndClassify = () => {
-    handleCamClick();
-    handleFileUpload();
-  };
-
   const takePhoto = () => {
     const photo = camera.current.takePhoto();
+    handleFileUpload();
     const photoFile = dataURLtoFile(photo, 'photo.jpg');
     setItemImage(photoFile);
-    handleFileUpload();
     setCameraOpen(false);
   };
 
@@ -203,205 +235,240 @@ export default function Home() {
         u8arr[n] = bstr.charCodeAt(n);
     }
     return new File([u8arr], filename, {type:mime});
-  }
+  };
 
   return (
-    <Box width="100vw" height="100vh" display="flex" justifyContent="center" alignItems="center" flexDirection="column" gap={2}>
-      <Modal open={cameraOpen} onClose={() => setCameraOpen(false)}>
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          width={400}
-          height={400}
-          bgcolor="white"
-          border="2px solid black"
-          boxShadow={24}
-          p={4}
-          display="flex"
-          flexDirection="column"
-          gap={3}
-          sx={{
-            transform: "translate(-50%, -50%)",
-            borderRadius: '16px',  // Rounded edges for the modal
-          }}
-        >
-          <Camera ref={camera} />
-          <Button onClick={takePhoto} variant="contained">Take photo</Button>
-        </Box>
-      </Modal>
-
-      <Modal open={open} onClose={handleClose}>
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          width={550}
-          bgcolor="white"
-          border="2px solid black"
-          boxShadow={24}
-          p={4}
-          display="flex"
-          flexDirection="column"
-          gap={3}
-          sx={{
-            transform: "translate(-50%, -50%)",
-            borderRadius: '16px',  // Rounded edges for the modal
-          }}
-        > 
-          <Typography variant="h6">Add item</Typography>
-          <Stack width="100%" direction="column" spacing={2}>
-            <TextField
-              variant='outlined'
-              fullWidth
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              label="Item Name"
-            />
-            <Box display="flex" gap={1} alignItems="center" justifyContent="space-between">
-              <input 
-                type="file" 
-                onChange={(e) => setItemImage(e.target.files[0])} 
-                style={{ flex: 1 }}
+    <ThemeProvider theme={customTheme}>
+      <Container maxWidth="lg" sx={{ py: 2 }}>
+        <AppBar position="static" sx={{ mb: 4 }}>
+          <Toolbar>
+            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+              Pantry Tracker
+            </Typography>
+            <Box sx={{ position: 'relative' }}>
+              <InputBase
+                placeholder="Search…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                sx={{
+                  color: 'inherit',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  borderRadius: 1,
+                  pl: 2,
+                  pr: 1,
+                  py: 0.5,
+                  width: '300px',
+                }}
               />
-              <Button 
-                variant="contained" 
-                size="small"
-                sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
-                onClick={handleCamClick}
-              >
-                Cam
-              </Button>
-              <Button 
-                variant="contained" 
-                size="small" 
-                sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
-                onClick={handleFileUpload}
-              >
-                Classify
-              </Button>
+              <IconButton type="submit" sx={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
+                <SearchIcon />
+              </IconButton>
             </Box>
-            <Button
-              variant="contained"
-              onClick={() => {
-                addItem(itemName, itemImage); // Pass itemImage correctly
-                setItemName('');
-                setItemImage(null);
-                handleClose();
-              }}
-            >
-              Add
-            </Button>
-          </Stack>
-        </Box>
-      </Modal>
+          </Toolbar>
+        </AppBar>
 
-      <Modal open={update} onClose={handleCloseUpdate}>
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          width={400}
-          bgcolor="white"
-          border="2px solid black"
-          boxShadow={24}
-          p={4}
-          display="flex"
-          flexDirection="column"
-          gap={3}
-          sx={{
-            transform: "translate(-50%, -50%)",
-            borderRadius: '16px',  // Rounded edges for the modal
-          }}
-        > 
-          <Typography variant="h6">Update Item</Typography>
-          <Stack width="100%" direction="column" spacing={2}>
-            <TextField
-              variant='outlined'
-              fullWidth
-              value={updatedName}
-              onChange={(e) => setUpdatedName(e.target.value)}
-              label="Item Name"
-            />
-            <TextField
-              variant='outlined'
-              fullWidth
-              value={updatedQuantity}
-              onChange={(e) => setUpdatedQuantity(e.target.value)}
-              label="Quantity"
-              type="number"
-            />
-            <input type="file" onChange={(e) => setItemImage(e.target.files[0])} />
-            <Button
-              variant="contained"
-              onClick={updateItem}
-            >
-              Save
-            </Button>
-          </Stack>
-        </Box>
-      </Modal>
+        <Modal open={cameraOpen} onClose={() => setCameraOpen(false)}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={800}
+            height={500}
+            bgcolor="white"
+            border="2px solid black"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            gap={3}
+            sx={{
+              transform: "translate(-50%, -50%)",
+              borderRadius: '16px',
+            }}
+          >
+            <Camera ref={camera} />
+            <Button onClick={takePhoto} variant="contained">Take photo</Button>
+          </Box>
+        </Modal>
 
-      <Box border="1px solid black" width="800px" sx={{ borderRadius: '16px' }}>
-        <Box
-          width="100%"
-          height="100px"
-          bgcolor="grey"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          sx={{ borderRadius: '16px 16px 0 0' }}
-        >
-          <Typography variant="h3">Inventory Items</Typography>
-        </Box>
-        <Box width="100%" height="550px" overflow="auto" padding={2}>
-          <Grid container spacing={2}>
-            {filteredInventory.map((item) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={item.name}>
-                <Card
-                  sx={{ borderRadius: '16px' }}
-                  onMouseDown={() => handleMouseDown(item)}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseLeave}
+        <Modal open={open} onClose={handleClose}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={550}
+            bgcolor="white"
+            border="2px solid black"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            gap={3}
+            sx={{
+              transform: "translate(-50%, -50%)",
+              borderRadius: '16px',
+            }}
+          >
+            <Typography variant="h6">Add item</Typography>
+            <Stack width="100%" direction="column" spacing={2}>
+              <TextField
+                variant='outlined'
+                fullWidth
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                label="Item Name"
+              />
+              <Box display="flex" gap={1} alignItems="center" justifyContent="space-between">
+                <input 
+                  type="file" 
+                  onChange={(e) => setItemImage(e.target.files[0])} 
+                  style={{ flex: 1 }}
+                />
+                <Button 
+                  variant="contained" 
+                  size="small"
+                  sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
+                  onClick={handleCamClick}
                 >
-                  <img
-                    src={item.imageUrl || defaultImageUrl}
-                    alt={item.name}
-                    style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '16px 16px 0 0' }}
-                  />
-                  <CardContent>
-                    <Typography variant="h5" component="div">
-                      {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
-                    </Typography>
-                    <Typography variant="h6" color="text.secondary">
-                      Quantity: {item.quantity}
-                    </Typography>
-                  </CardContent>
-                  <CardActions>
-                    <Button variant="contained" onClick={() => addItem(item.name)}>
-                      Add
-                    </Button>
-                    <Button variant="contained" onClick={() => removeItem(item.name)}>
-                      Remove
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      </Box>
+                  Cam
+                </Button>
+                <Button 
+                  variant="contained" 
+                  size="small" 
+                  sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
+                  onClick={handleFileUpload}
+                >
+                  Classify
+                </Button>
+              </Box>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  addItem(itemName, itemImage);
+                  setItemName('');
+                  setItemImage(null);
+                  handleClose();
+                }}
+              >
+                Add
+              </Button>
+            </Stack>
+          </Box>
+        </Modal>
 
-      <Box width="800px" display="flex" justifyContent="space-between" alignItems="center" flexDirection="row" gap={2}>
-        <TextField 
-          variant='outlined'
-          placeholder="Search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ flex: 0.7 }} // Use flex to make the search bar take most of the space
-        />
-        <Button variant="contained" onClick={handleOpen} sx={{ flexShrink: 0 }}>Add New Item</Button>
-      </Box>
-    </Box>
+        <Modal open={update} onClose={handleCloseUpdate}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={550}
+            bgcolor="white"
+            border="2px solid black"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            gap={3}
+            sx={{
+              transform: "translate(-50%, -50%)",
+              borderRadius: '16px',
+            }}
+          >
+            <Typography variant="h6">Update Item</Typography>
+            <Stack width="100%" direction="column" spacing={2}>
+              <TextField
+                variant='outlined'
+                fullWidth
+                value={updatedName}
+                onChange={(e) => setUpdatedName(e.target.value)}
+                label="Item Name"
+              />
+              <TextField
+                variant='outlined'
+                fullWidth
+                value={updatedQuantity}
+                onChange={(e) => setUpdatedQuantity(e.target.value)}
+                label="Quantity"
+                type="number"
+              />
+              <input type="file" onChange={(e) => setItemImage(e.target.files[0])} />
+              <Button
+                variant="contained"
+                onClick={updateItem}
+              >
+                Save
+              </Button>
+            </Stack>
+          </Box>
+        </Modal>
+
+        <Box display="flex" gap={2}>
+          <Box width="65%" height="600px" overflow="auto" padding={2} border="1px solid black" sx={{ borderRadius: '16px' }}>
+            <Box
+              width="100%"
+              height="100px"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              sx={{ borderRadius: '16px 16px 0 0' }}
+            >
+              <Typography variant="h3">Inventory Items</Typography>
+            </Box>
+            <Grid container spacing={2}>
+              {filteredInventory.map((item) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={item.name}>
+                  <Card
+                    sx={{ borderRadius: '16px' }}
+                    onMouseDown={() => handleMouseDown(item)}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseLeave}
+                  >
+                    <img
+                      src={item.imageUrl || defaultImageUrl}
+                      alt={item.name}
+                      style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '16px 16px 0 0' }}
+                    />
+                    <CardContent>
+                      <Typography variant="h6" component="div">
+                        {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Quantity: {item.quantity}
+                      </Typography>
+                    </CardContent>
+                    <CardActions>
+                      <Button variant="contained" size="small" onClick={() => addItem(item.name)}>
+                        Add
+                      </Button>
+                      <Button variant="contained" size="small" onClick={() => removeItem(item.name)}>
+                        Remove
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+
+          <Box width="35%" padding={1} border="1px solid black" sx={{ borderRadius: '16px' }}>
+            <Typography variant="h4" sx={{ mb: 2 }}>Recipe Generator</Typography>
+            <Divider sx={{ mb: 2 }} />
+            <Stack spacing={2}>
+              <Button variant="contained" onClick={generateRecipes}>Generate Recipes</Button>
+            </Stack>
+            <Typography variant="body1">{recipes}</Typography>
+          </Box>
+        </Box>
+
+        <Fab
+          color="primary"
+          aria-label="add"
+          onClick={handleOpen}
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+        >
+          <AddIcon />
+        </Fab>
+      </Container>
+    </ThemeProvider>
   );
 }
