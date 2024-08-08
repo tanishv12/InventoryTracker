@@ -13,6 +13,7 @@ export default function Home() {
   const [update, setUpdate] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   const [updatedName, setUpdatedName] = useState('');
+  const [updatedQuantity, setUpdatedQuantity] = useState('');
   const [itemName, setItemName] = useState('');
   const [itemImage, setItemImage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,17 +85,18 @@ export default function Home() {
     }
 
     // Update the existing document
-    await updateDoc(docRef, { name: updatedName, imageUrl });
+    await updateDoc(docRef, { name: updatedName, quantity: parseInt(updatedQuantity), imageUrl });
 
     // If the name has changed, create a new document with the updated name and delete the old one
     if (currentItem.name !== updatedName) {
       const newDocRef = doc(firestore, 'inventory', updatedName);
-      await setDoc(newDocRef, { name: updatedName, quantity: currentItem.quantity, imageUrl });
+      await setDoc(newDocRef, { name: updatedName, quantity: parseInt(updatedQuantity), imageUrl });
       await deleteDoc(docRef);
     }
 
     setCurrentItem(null);
     setUpdatedName('');
+    setUpdatedQuantity('');
     setItemImage(null);
     setUpdate(false);
     await updateInventory();
@@ -105,6 +107,7 @@ export default function Home() {
   const handleUpdateOpen = (item) => {
     setCurrentItem(item);
     setUpdatedName(item.name);
+    setUpdatedQuantity(item.quantity.toString());
     setItemImage(null); // Clear previous image
     setUpdate(true);
   };
@@ -211,6 +214,14 @@ export default function Home() {
               value={updatedName}
               onChange={(e) => setUpdatedName(e.target.value)}
               label="Item Name"
+            />
+            <TextField
+              variant='outlined'
+              fullWidth
+              value={updatedQuantity}
+              onChange={(e) => setUpdatedQuantity(e.target.value)}
+              label="Quantity"
+              type="number"
             />
             <input type="file" onChange={(e) => setItemImage(e.target.files[0])} />
             <Button
