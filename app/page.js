@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from "react";
+import { Camera } from "react-camera-pro";
 import { firestore, storage, model } from '@/firebase';
 import { Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid } from "@mui/material";
 import { collection, query, getDocs, setDoc, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
@@ -10,7 +11,9 @@ const defaultImageUrl = 'https://coolbackgrounds.io/images/backgrounds/white/whi
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [update, setUpdate] = useState(false);
+  const camera = useRef(null);
   const [currentItem, setCurrentItem] = useState(null);
   const [updatedName, setUpdatedName] = useState('');
   const [updatedQuantity, setUpdatedQuantity] = useState('');
@@ -59,7 +62,7 @@ export default function Home() {
       await uploadBytes(storageRef, image);
       imageUrl = await getDownloadURL(storageRef);
     }
-
+    
     const docRef = doc(firestore, 'inventory', capitalizedItem);
     const docSnap = await getDoc(docRef);
 
@@ -176,14 +179,64 @@ export default function Home() {
     }
   };
 
+  const handleCamClick = () => {
+    setCameraOpen(true);
+  };
+
+  const handleCamAndClassify = () => {
+    handleCamClick();
+    handleFileUpload();
+  };
+
+  const takePhoto = () => {
+    const photo = camera.current.takePhoto();
+    const photoFile = dataURLtoFile(photo, 'photo.jpg');
+    setItemImage(photoFile);
+    handleFileUpload();
+    setCameraOpen(false);
+  };
+
+  const dataURLtoFile = (dataurl, filename) => {
+    let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type:mime});
+  }
+
   return (
     <Box width="100vw" height="100vh" display="flex" justifyContent="center" alignItems="center" flexDirection="column" gap={2}>
-      <Modal open={open} onClose={handleClose}>
+      <Modal open={cameraOpen} onClose={() => setCameraOpen(false)}>
         <Box
           position="absolute"
           top="50%"
           left="50%"
           width={400}
+          height={400}
+          bgcolor="white"
+          border="2px solid black"
+          boxShadow={24}
+          p={4}
+          display="flex"
+          flexDirection="column"
+          gap={3}
+          sx={{
+            transform: "translate(-50%, -50%)",
+            borderRadius: '16px',  // Rounded edges for the modal
+          }}
+        >
+          <Camera ref={camera} />
+          <Button onClick={takePhoto} variant="contained">Take photo</Button>
+        </Box>
+      </Modal>
+
+      <Modal open={open} onClose={handleClose}>
+        <Box
+          position="absolute"
+          top="50%"
+          left="50%"
+          width={550}
           bgcolor="white"
           border="2px solid black"
           boxShadow={24}
@@ -205,12 +258,24 @@ export default function Home() {
               onChange={(e) => setItemName(e.target.value)}
               label="Item Name"
             />
-            <Box>
-              <input type="file" onChange={(e) => setItemImage(e.target.files[0])} />
+            <Box display="flex" gap={1} alignItems="center" justifyContent="space-between">
+              <input 
+                type="file" 
+                onChange={(e) => setItemImage(e.target.files[0])} 
+                style={{ flex: 1 }}
+              />
+              <Button 
+                variant="contained" 
+                size="small"
+                sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
+                onClick={handleCamClick}
+              >
+                Cam
+              </Button>
               <Button 
                 variant="contained" 
                 size="small" 
-                sx={{ minWidth: '30px', padding: '5px 10px', fontSize: '10px' }}
+                sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
                 onClick={handleFileUpload}
               >
                 Classify
