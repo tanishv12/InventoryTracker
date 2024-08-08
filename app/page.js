@@ -4,9 +4,9 @@ import { Camera } from "react-camera-pro";
 import { firestore, storage, model } from '@/firebase';
 import {
   Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid, Container, ListItemText,
-  AppBar, Toolbar, IconButton, InputBase, Paper, Fab, Divider, ThemeProvider ,createTheme, List, ListItem
+  AppBar, Toolbar, IconButton, InputBase, Paper, Fab, Divider, ThemeProvider ,createTheme, List, ListItem, ButtonBase
 } from "@mui/material";
-import { Add as AddIcon, Search as SearchIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Add as AddIcon, Search as SearchIcon, Close as CloseIcon, CameraAlt as CameraIcon, Delete as DeleteIcon, Edit as EditIcon, Remove as RemoveIcon } from '@mui/icons-material';
 import { collection, query, getDocs, setDoc, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -239,11 +239,11 @@ export default function Home() {
 
   return (
     <ThemeProvider theme={customTheme}>
-      <Container maxWidth="lg" sx={{ py: 2 }}>
-        <AppBar position="static" sx={{ mb: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <AppBar position="static" sx={{ mb: 3 }}>
           <Toolbar>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>
-              Pantry Tracker
+            <Typography variant="h4" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+              Inventory Tracker
             </Typography>
             <Box sx={{ position: 'relative' }}>
               <InputBase
@@ -324,25 +324,28 @@ export default function Home() {
                   onChange={(e) => setItemImage(e.target.files[0])} 
                   style={{ flex: 1 }}
                 />
-                <Button 
-                  variant="contained" 
-                  size="small"
-                  sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
+                <IconButton 
+                  color="primary" 
                   onClick={handleCamClick}
+                  sx={{ flex: 1 }}
                 >
-                  Cam
-                </Button>
-                <Button 
+                <CameraIcon />
+                </IconButton>
+                <ButtonBase
                   variant="contained" 
                   size="small" 
                   sx={{ padding: '5px 10px', fontSize: '10px', flex: 1 }}
                   onClick={handleFileUpload}
                 >
-                  Classify
-                </Button>
+                  <img 
+                    src="/geminiLogo.png" 
+                    style={{ width: '24px', height: '24px' }}
+                  />
+                </ButtonBase>
               </Box>
               <Button
-                variant="contained"
+                variant="outlined"
+                startIcon={<AddIcon/>}
                 onClick={() => {
                   addItem(itemName, itemImage);
                   setItemName('');
@@ -350,7 +353,7 @@ export default function Home() {
                   handleClose();
                 }}
               >
-                Add
+                Add Item
               </Button>
             </Stack>
           </Box>
@@ -393,7 +396,7 @@ export default function Home() {
               />
               <input type="file" onChange={(e) => setItemImage(e.target.files[0])} />
               <Button
-                variant="contained"
+                variant="outlined"
                 onClick={updateItem}
               >
                 Save
@@ -412,13 +415,14 @@ export default function Home() {
               justifyContent="center"
               sx={{ borderRadius: '16px 16px 0 0' }}
             >
-              <Typography variant="h3">Inventory Items</Typography>
+              <Typography variant="h4" sx={{fontWeight:'bold'}}>Inventory</Typography>
             </Box>
             <Grid container spacing={2}>
               {filteredInventory.map((item) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={item.name}>
                   <Card
-                    sx={{ borderRadius: '16px' }}
+                    sx={{ borderRadius: '16px', border: '1px solid #000', boxShadow: 4 }}
+                    border="1px solid black"
                     onMouseDown={() => handleMouseDown(item)}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseLeave}
@@ -437,12 +441,14 @@ export default function Home() {
                       </Typography>
                     </CardContent>
                     <CardActions>
-                      <Button variant="contained" size="small" onClick={() => addItem(item.name)}>
-                        Add
-                      </Button>
-                      <Button variant="contained" size="small" onClick={() => removeItem(item.name)}>
-                        Remove
-                      </Button>
+                      <Box display="flex" justifyContent="center" gap={5} width="100%">
+                        <IconButton onClick={() => addItem(item.name)} sx={{ color: 'black' }}>
+                          <AddIcon />
+                        </IconButton>
+                        <IconButton onClick={() => removeItem(item.name)} sx={{ color: 'black' }}>
+                          <RemoveIcon />
+                        </IconButton>
+                      </Box>
                     </CardActions>
                   </Card>
                 </Grid>
@@ -451,10 +457,15 @@ export default function Home() {
           </Box>
 
           <Box width="35%" padding={1} border="1px solid black" sx={{ borderRadius: '16px' }}>
-            <Typography variant="h4" sx={{ mb: 2 }}>Recipe Generator</Typography>
+            <Typography variant="h5" sx={{ textAlign: 'center', marginTop: "35px", fontWeight:'bold' }}>Recipe Ideas</Typography>
             <Divider sx={{ mb: 2 }} />
             <Stack spacing={2}>
-              <Button variant="contained" onClick={generateRecipes}>Generate Recipes</Button>
+              <ButtonBase variant="outlined" onClick={generateRecipes}>
+                  <img 
+                    src="/geminiLogo.png" 
+                    style={{ width: '24px', height: '24px' }}
+                  />
+              </ButtonBase>
             </Stack>
             <Typography variant="body1">{recipes}</Typography>
           </Box>
@@ -464,7 +475,7 @@ export default function Home() {
           color="primary"
           aria-label="add"
           onClick={handleOpen}
-          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          sx={{ position: 'fixed', bottom: 16, right: 40 }}
         >
           <AddIcon />
         </Fab>
