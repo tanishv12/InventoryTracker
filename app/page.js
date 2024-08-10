@@ -514,3 +514,27 @@ export default function Home() {
     </ThemeProvider>
   );
 }
+
+function RecipeCard({ title, details }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const handleExpandClick = () => {
+    setExpanded(!expanded);
+  };
+
+  return (
+    <Card sx={{ maxWidth: 345, marginBottom: 2 }}>
+      <CardContent>
+        <Typography variant="h6">{title}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {expanded ? details : details.substring(0, 100) + '...'}
+        </Typography>
+      </CardContent>
+      <CardActions>
+        <Button size="small" onClick={handleExpandClick}>
+          {expanded ? "Show Less" : "Show More"}
+        </Button>
+      </CardActions>
+    </Card>
+  );
+}
