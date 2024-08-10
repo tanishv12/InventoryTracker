@@ -6,6 +6,7 @@ import {
   Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid, Container, Fab, Divider, ThemeProvider, createTheme, ButtonBase, IconButton, InputBase
 } from "@mui/material";
 import { Add as AddIcon, CameraAlt as CameraIcon, Remove as RemoveIcon, Kitchen as KitchenIcon, Inventory as InventoryIcon, Search as SearchIcon, RestaurantMenu as RestaurantMenuIcon, MenuBook as MenuBookIcon } from '@mui/icons-material';
+import ImageIcon from '@mui/icons-material/Image';
 import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -417,11 +418,18 @@ export default function Home() {
                 label="Item Name"
               />
               <Box display="flex" gap={1} alignItems="center" justifyContent="space-between">
+              <IconButton 
+                color="primary" 
+                component="label"  // Makes the IconButton act as a label for the input
+                sx={{ flex: 1 }}
+              >
+                <ImageIcon />
                 <input 
                   type="file" 
                   onChange={(e) => setItemImage(e.target.files[0])} 
-                  style={{ flex: 1 }}
+                  hidden  // Hide the file input
                 />
+              </IconButton>
                 <IconButton 
                   color="primary" 
                   onClick={handleCamClick}
