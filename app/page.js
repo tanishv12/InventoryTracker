@@ -1,36 +1,37 @@
-'use client'
+'use client';
 import { useState, useEffect, useRef } from "react";
 import { Camera } from "react-camera-pro";
 import { firestore, storage, model } from '@/firebase';
 import {
-  Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid, Container, ListItemText,
-  AppBar, Toolbar, IconButton, InputBase, Paper, Fab, Divider, ThemeProvider ,createTheme, List, ListItem, ButtonBase
+  Box, Modal, Stack, Button, TextField, Typography, Card, CardContent, CardActions, Grid, Container, Fab, Divider, ThemeProvider, createTheme, ButtonBase, IconButton, InputBase
 } from "@mui/material";
-import { Add as AddIcon, Search as SearchIcon, Close as CloseIcon, CameraAlt as CameraIcon, Delete as DeleteIcon, Edit as EditIcon, Remove as RemoveIcon } from '@mui/icons-material';
-import { collection, query, getDocs, setDoc, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
+import { Add as AddIcon, CameraAlt as CameraIcon, Remove as RemoveIcon, Kitchen as KitchenIcon, Inventory as InventoryIcon, Search as SearchIcon, RestaurantMenu as RestaurantMenuIcon, MenuBook as MenuBookIcon } from '@mui/icons-material';
+import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const defaultImageUrl = 'https://coolbackgrounds.io/images/backgrounds/white/white-trianglify-b79c7e1f.jpg';
 
 const customTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#000000', // Black
+    palette: {
+      mode: 'dark',
+      primary: {
+        main: '#000000', // Black
+      },
+      secondary: {
+        main: '#B0B0B0', // Dark gray
+      },
+      background: {
+        default: '#121212', // Very dark gray
+        paper: '#B0B0B0', // Dark gray for cards and papers
+      },
+      text: {
+        primary: '#000000', // White text
+        secondary: '#424242', // Light gray text
+      },
     },
-    secondary: {
-      main: '#B0B0B0', // Dark gray
-    },
-    background: {
-      default: '#121212', // Very dark gray
-      paper: '#B0B0B0', // Dark gray for cards and papers
-    },
-    text: {
-      primary: '#000000', // White text
-      secondary: '#424242', // Light gray text
-    },
-  },
-});
+  });
+
+
 
 export default function Home() {
   const [inventory, setInventory] = useState([]);
@@ -43,9 +44,11 @@ export default function Home() {
   const [updatedQuantity, setUpdatedQuantity] = useState('');
   const [itemName, setItemName] = useState('');
   const [itemImage, setItemImage] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const longPressTimerRef = useRef(null);
+  const [activeScreen, setActiveScreen] = useState('pantry'); // 'pantry' or 'recipes'
   const [recipes, setRecipes] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const longPressTimerRef = useRef(null);
 
   const updateInventory = async () => {
     const snapshot = await getDocs(collection(firestore, 'inventory'));
@@ -59,14 +62,15 @@ export default function Home() {
     setInventory(inventoryList);
   };
 
-  const capitalizeFirstLetter = (string) => {
-    return string.charAt(0).toUpperCase() + string.slice(1);
-  };
+  useEffect(() => {
+    updateInventory();
+  }, []);
+
+  const capitalizeFirstLetter = (string) => string.charAt(0).toUpperCase() + string.slice(1);
 
   const removeItem = async (item) => {
     const docRef = doc(firestore, 'inventory', item);
     const docSnap = await getDoc(docRef);
-
     if (docSnap.exists()) {
       const { quantity } = docSnap.data();
       if (quantity === 1) {
@@ -76,6 +80,24 @@ export default function Home() {
       }
     }
     await updateInventory();
+  };
+
+  const handleMouseDown = (item) => {
+    longPressTimerRef.current = setTimeout(() => {
+      handleLongPress(item);
+    }, 1000);
+  };
+
+  const handleMouseUp = () => {
+    clearTimeout(longPressTimerRef.current);
+  };
+
+  const handleMouseLeave = () => {
+    clearTimeout(longPressTimerRef.current);
+  };
+
+  const handleLongPress = (item) => {
+    handleUpdateOpen(item);
   };
 
   const addItem = async (item, image) => {
@@ -139,31 +161,34 @@ export default function Home() {
   };
   const handleCloseUpdate = () => setUpdate(false);
 
-  useEffect(() => {
-    updateInventory();
-  }, []);
-
   const filteredInventory = inventory.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleLongPress = (item) => {
-    handleUpdateOpen(item);
+  const generateRecipes = async () => {
+    const foodItems = inventory.map(item => item.name).join(", ");
+    const prompt = `Generate a few recipes using these ingredients: ${foodItems}. Make it very concise with instructions.`;
+
+    try {
+      const result = await model.generateContentStream([{ text: prompt }]);
+
+      let generatedRecipe = '';
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        generatedRecipe += chunkText;
+      }
+
+      setRecipes(generatedRecipe.trim());
+    } catch (error) {
+      console.error("Error generating content: ", error);
+    }
   };
 
-  const handleMouseDown = (item) => {
-    longPressTimerRef.current = setTimeout(() => {
-      handleLongPress(item);
-    }, 1000);
+  const handleCamClick = () => {
+    setCameraOpen(true);
   };
 
-  const handleMouseUp = () => {
-    clearTimeout(longPressTimerRef.current);
-  };
-
-  const handleMouseLeave = () => {
-    clearTimeout(longPressTimerRef.current);
-  };
+  
 
   const fileToGenerativePart = async (file) => {
     const base64EncodedDataPromise = new Promise((resolve) => {
@@ -197,34 +222,11 @@ export default function Home() {
     }
   };
 
-  const generateRecipes = async () => {
-    const foodItems = inventory.map(item => item.name).join(", ");
-    const prompt = "Generate a few recipes using these ingredients: " + foodItems + ". Make it very concise with instructions.";
-
-    try {
-      const result = await model.generateContentStream([{ text: prompt }]);
-
-      let generatedRecipe = '';
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        generatedRecipe += chunkText;
-      }
-
-      setRecipes(generatedRecipe.trim());
-    } catch (error) {
-      console.error("Error generating content: ", error);
-    }
-  };
-  
-  const handleCamClick = () => {
-    setCameraOpen(true);
-  };
-
   const takePhoto = () => {
     const photo = camera.current.takePhoto();
-    handleFileUpload();
     const photoFile = dataURLtoFile(photo, 'photo.jpg');
-    setItemImage(photoFile);
+    setItemImage(photoFile);  // Set the image state
+    handleFileUpload(photoFile);  // Classify the image directly
     setCameraOpen(false);
   };
 
@@ -240,33 +242,129 @@ export default function Home() {
   return (
     <ThemeProvider theme={customTheme}>
       <Container maxWidth="lg" sx={{ py: 3 }}>
-        <AppBar position="static" sx={{ mb: 3 }}>
-          <Toolbar>
-            <Typography variant="h4" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-              Inventory Tracker
-            </Typography>
-            <Box sx={{ position: 'relative' }}>
+        {/* Heading with Navigation Buttons */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            Inventory Tracker
+          </Typography>
+          <Box display="flex" alignItems="center" gap={2}>
+            <ButtonBase onClick={() => setActiveScreen('pantry')} sx={{ display: 'flex', alignItems: 'center' }}>
+              <RestaurantMenuIcon sx={{ mr: 1 }} />
+              <Typography>Pantry Items</Typography>
+            </ButtonBase>
+            <ButtonBase onClick={() => { setActiveScreen('recipes'); generateRecipes(); }} sx={{ display: 'flex', alignItems: 'center' }}>
+              <MenuBookIcon sx={{ mr: 1 }} />
+              <Typography>Generate Recipes</Typography>
+            </ButtonBase>
+            {searchOpen && (
               <InputBase
                 placeholder="Search…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 sx={{
-                  color: 'inherit',
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  borderRadius: 1,
-                  pl: 2,
-                  pr: 1,
-                  py: 0.5,
-                  width: '300px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '8px',
+                  padding: '4px 8px',
+                  transition: 'width 0.3s ease',
+                  width: searchOpen ? '300px' : '0px',
+                  opacity: searchOpen ? 1 : 0,
+                  mr: 2,
                 }}
               />
-              <IconButton type="submit" sx={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
-                <SearchIcon />
-              </IconButton>
-            </Box>
-          </Toolbar>
-        </AppBar>
+            )}
+            <IconButton onClick={() => setSearchOpen(!searchOpen)}>
+              <SearchIcon sx={{ color:"black", mr: 1 }}/>
+            </IconButton>
+          </Box>
+        </Box>
 
+        {/* Conditional Rendering of Screens */}
+        {activeScreen === 'pantry' && (
+  <>
+    <Box width="100%" height="auto" overflow="auto" padding={2} sx={{ borderRadius: '16px', backgroundColor: '#f9f9f9' }}>
+      <Grid container spacing={4}>
+        {filteredInventory.length === 0 ? (
+          <Grid item xs={12}>
+            <Typography variant="h6" sx={{ textAlign: 'center', marginTop: '20px', color: 'gray' }}>
+              No items in inventory <Button
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={handleOpen}
+            >
+            </Button>
+            </Typography>
+          </Grid>
+        ) : (
+          filteredInventory.map((item) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={item.name}>
+              <Card
+                sx={{
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)',
+                  backgroundColor: '#FFFFFF',
+                  transition: 'transform 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'scale(1.03)',
+                  },
+                }}
+                onMouseDown={() => handleMouseDown(item)}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
+              >
+                <img
+                  src={item.imageUrl || defaultImageUrl}
+                  alt={item.name}
+                  style={{
+                    width: '100%',
+                    height: '150px',
+                    objectFit: 'cover',
+                    borderRadius: '12px 12px 0 0',
+                  }}
+                />
+                <CardContent sx={{ padding: '16px', backgroundColor: '#fafafa' }}>
+                  <Typography variant="h6" component="div" sx={{ marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>
+                    {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', marginBottom: '16px' }}>
+                    Quantity: {item.quantity}
+                  </Typography>
+                  <CardActions sx={{ justifyContent: 'space-around' }}>
+                    <IconButton onClick={() => addItem(item.name)} sx={{ color: 'primary.main' }}>
+                      <AddIcon />
+                    </IconButton>
+                    <IconButton onClick={() => removeItem(item.name)} sx={{ color: 'primary.main' }}>
+                      <RemoveIcon />
+                    </IconButton>
+                  </CardActions>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))
+        )}
+      </Grid>
+    </Box>
+
+
+            <Fab
+              color="primary"
+              aria-label="add"
+              onClick={handleOpen}
+              sx={{ position: 'fixed', bottom: 16, right: 40 }}
+            >
+              <AddIcon />
+            </Fab>
+          </>
+        )}
+
+        {activeScreen === 'recipes' && (
+          <Box padding={2} sx={{ borderRadius: '16px' }}>
+            <Typography variant="h5" sx={{ textAlign: 'center', marginBottom: "20px", fontWeight:'bold' }}>Generated Recipes</Typography>
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="body1">{recipes}</Typography>
+          </Box>
+        )}
+
+        {/* Modals for Adding/Updating Items */}
         <Modal open={cameraOpen} onClose={() => setCameraOpen(false)}>
           <Box
             position="absolute"
@@ -329,7 +427,7 @@ export default function Home() {
                   onClick={handleCamClick}
                   sx={{ flex: 1 }}
                 >
-                <CameraIcon />
+                  <CameraIcon />
                 </IconButton>
                 <ButtonBase
                   variant="contained" 
@@ -345,7 +443,7 @@ export default function Home() {
               </Box>
               <Button
                 variant="outlined"
-                startIcon={<AddIcon/>}
+                startIcon={<AddIcon />}
                 onClick={() => {
                   addItem(itemName, itemImage);
                   setItemName('');
@@ -404,81 +502,6 @@ export default function Home() {
             </Stack>
           </Box>
         </Modal>
-
-        <Box display="flex" gap={2}>
-          <Box width="65%" height="600px" overflow="auto" padding={2} border="1px solid black" sx={{ borderRadius: '16px' }}>
-            <Box
-              width="100%"
-              height="100px"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              sx={{ borderRadius: '16px 16px 0 0' }}
-            >
-              <Typography variant="h4" sx={{fontWeight:'bold'}}>Inventory</Typography>
-            </Box>
-            <Grid container spacing={2}>
-              {filteredInventory.map((item) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={item.name}>
-                  <Card
-                    sx={{ borderRadius: '16px', border: '1px solid #000', boxShadow: 4 }}
-                    border="1px solid black"
-                    onMouseDown={() => handleMouseDown(item)}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseLeave}
-                  >
-                    <img
-                      src={item.imageUrl || defaultImageUrl}
-                      alt={item.name}
-                      style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '16px 16px 0 0' }}
-                    />
-                    <CardContent>
-                      <Typography variant="h6" component="div">
-                        {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Quantity: {item.quantity}
-                      </Typography>
-                    </CardContent>
-                    <CardActions>
-                      <Box display="flex" justifyContent="center" gap={5} width="100%">
-                        <IconButton onClick={() => addItem(item.name)} sx={{ color: 'black' }}>
-                          <AddIcon />
-                        </IconButton>
-                        <IconButton onClick={() => removeItem(item.name)} sx={{ color: 'black' }}>
-                          <RemoveIcon />
-                        </IconButton>
-                      </Box>
-                    </CardActions>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-
-          <Box width="35%" padding={1} border="1px solid black" sx={{ borderRadius: '16px' }}>
-            <Typography variant="h5" sx={{ textAlign: 'center', marginTop: "35px", fontWeight:'bold' }}>Recipe Ideas</Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Stack spacing={2}>
-              <ButtonBase variant="outlined" onClick={generateRecipes}>
-                  <img 
-                    src="/geminiLogo.png" 
-                    style={{ width: '24px', height: '24px' }}
-                  />
-              </ButtonBase>
-            </Stack>
-            <Typography variant="body1">{recipes}</Typography>
-          </Box>
-        </Box>
-
-        <Fab
-          color="primary"
-          aria-label="add"
-          onClick={handleOpen}
-          sx={{ position: 'fixed', bottom: 16, right: 40 }}
-        >
-          <AddIcon />
-        </Fab>
       </Container>
     </ThemeProvider>
   );
