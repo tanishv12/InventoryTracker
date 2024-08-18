@@ -9,13 +9,13 @@ import { getVertexAI, getGenerativeModel } from "firebase/vertexai-preview";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: AIzaSyCem1fY9EiSTKNQXx4P3M_MNdeXFYV7p0k,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID,
-  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
+  apiKey: 'AIzaSyCem1fY9EiSTKNQXx4P3M_MNdeXFYV7p0k',
+  authDomain: 'inventorytracker-8ad38.firebaseapp.com',
+  projectId: 'inventorytracker-8ad38',
+  storageBucket: 'inventorytracker-8ad38.appspot.com',
+  messagingSenderId: '176861243461',
+  appId: '1:176861243461:web:bcafacac3b4ec7683f5b2c',
+  measurementId: 'G-KPL3RMP4Q3'
 };
 
 // Initialize Firebase
